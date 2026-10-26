@@ -10,7 +10,7 @@ export default {
     s3: `Mais... et qui suis-je${N}?`,
     s4: `Bon, c’est une question très philosophique, tu ne trouves pas${N}?`,
     s5: `Je suis étudiant en physique. Je me consacre à l’étude et à la détection de nouveaux astéroïdes${N}; pour l’instant, ce n’est qu’une piste de recherche que j’ai choisie, mais je n’ai pas encore décidé vers quelle branche de la science je me dirigerai.`,
-    orbitas: 'orbites',
+    orbitas: 'orbites', deteccion: 'trouvé par mon programme',
     s6: `Et qu’est-ce qui m’intéresse${N}?`,
     s7: `J’aime beaucoup de choses, mais ce qui ressort le plus, c’est que j’aime la photographie argentique et la lecture${N}; mes genres préférés sont la science-fiction, l’action, la fantasy et, de temps en temps, la romance. J’aime jouer du violon, les animaux en général, avec une préférence pour les chats, même si mon animal préféré est le tardigrade. Et bien sûr, j’adore programmer.`,
     tardigrado: 'tardigrade',

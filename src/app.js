@@ -145,7 +145,7 @@ class Slide {
 
   /* ── obstáculos: fotos y dibujos ── */
   makeObstacle(o) {
-    const node = mk('obst ' + o.kind, this.stuff)
+    const node = mk('obst ' + o.kind + (o.sci ? ' sci' : ''), this.stuff)
     node.style.width = o.w + 'px'; node.style.height = o.h + 'px'
     if (o.kind === 'photo') {
       mk('tape', node)

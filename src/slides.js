@@ -64,8 +64,12 @@ export const slides = [
         drift: drift(26, 18, 0.55, 0.4),
         hero: { dur: 5600, settle: 'detect', trail: 'dust', keys: [[0, 40, 640, -30], [0.14, 200, 470, 90], [0.3, 420, 560, 230], [0.46, 640, 330, 380], [0.62, 520, 190, 520], [0.8, 760, 120, 640], [1, 880, 110, 728]] } },
       { kind: 'doodle', id: 'orbit', w: 300, h: 170, x: 120, y: 478, rot: -3, cap: T.orbitas, from: [-500, 300], delay: 0, drift: drift(24, 12, 0.5, 0.7, 1) },
-      { kind: 'doodle', id: 'constellation', w: 220, h: 147, x: 640, y: 510, rot: 2, from: [400, 400], delay: 350, drift: drift(18, 14, 0.7, 0.5, 2) },
+      // los cuatro cuadros donde mi programa encontró NHU0001 (figura 2 del informe de AsteroidPipeline)
+      { kind: 'photo', src: IMG('nhu0001'), sci: true, w: 210, h: 232, x: 520, y: 442, rot: -2, pad: 16, cap: T.deteccion, from: [0, 480], delay: 200, drift: drift(12, 10, 0.6, 0.5, 0.8) },
+      { kind: 'doodle', id: 'constellation', w: 200, h: 134, x: 960, y: 500, rot: 2, from: [400, 400], delay: 450, drift: drift(16, 12, 0.7, 0.5, 2) },
     ],
+    // en vertical la imagen de detección va grande en el hueco bajo el texto
+    portrait: { obstacles: { 1: { x: 40, y: 1065 }, 2: { w: 300, h: 328, x: 210, y: 712, rot: 3 }, 3: { x: 500, y: 1085 } } },
   },
 
   // 6 ── ¿Y qué me interesa?
@@ -139,7 +143,7 @@ function portraitOf(s) {
     const box = o.box || (centered ? { x: 70, y: 110, w: 580, h: 1060 } : { x: 70, y: 84, w: 580, h: 1120 })
     return { ...b, font: INK(+(px * f).toFixed(1)), lh: b.lh * f, box }
   })
-  const obstacles = (s.obstacles || []).map((o) => {
+  const obstacles = (s.obstacles || []).map((o, i) => {
     const w = o.w * K, h = o.h * K
     // se traslada el centro del objeto y se mantiene dentro del papel
     const at = (x, y) => [
@@ -151,7 +155,7 @@ function portraitOf(s) {
     if (o.from) q.from = [o.from[0] * 0.6, o.from[1] * 1.4]
     if (o.drift) q.drift = { ...o.drift, ax: o.drift.ax * 0.6, ay: o.drift.ay * 0.6 }
     if (o.hero) q.hero = { ...o.hero, keys: o.hero.keys.map(([t, kx, ky, r]) => [t, ...at(kx, ky), r]) }
-    return q
+    return Object.assign(q, p.obstacles?.[i])
   })
   const fl = s.flourish && { ...s.flourish, w: s.flourish.w * 0.6, x: PW / 2 - s.flourish.w * 0.3, y: PH / 2 + 95 }
   const seal = p.seal || (s.seal && { x: PX(s.seal.x), y: PY(s.seal.y) })
