@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+<style>
+:root{
+  --ink:#16213f; --ink-dry:#27386a; --accent:#a8472f;
+  --paper:#f3e6c6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#0d0a09;user-select:none;-webkit-user-select:none;touch-action:none}
+body{
+  background:
+    radial-gradient(900px 600px at 50% 46%, rgba(255,176,86,.22), transparent 70%),
+    radial-gradient(ellipse at 50% 50%, #3a2619 0%, #1c120d 55%, #0b0706 100%);
+  font-family:'Homemade Apple',cursive;font-synthesis:none;
+}
+body::before{ /* parpadeo de vela: la luz sigue un poco al puntero (--lx/--ly desde app.js) */
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:1;
+  background:
+    radial-gradient(520px 380px at var(--lx,50%) var(--ly,48%), rgba(255,200,120,.16), transparent 70%),
+    radial-gradient(700px 500px at 50% 48%, rgba(255,190,110,.18), transparent 70%);
+  animation:flicker 4.2s ease-in-out infinite;
+}
+@keyframes flicker{0%,100%{opacity:.85}30%{opacity:1}55%{opacity:.78}75%{opacity:.95}}
+body::after{ /* viñeta */
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+  background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%);
+}
+#dust{position:fixed;inset:0;z-index:2;pointer-events:none}
+
+#stage{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:center;z-index:5;opacity:0;transition:opacity .8s}
+body.ready #stage{opacity:1}
+#pages,.page{position:absolute;inset:0}
+#pages{perspective:2600px}
+.page{will-change:transform,opacity;transform-style:preserve-3d}
+
+/* ── papel ── */
+.paper{
+  position:absolute;left:40px;top:30px;width:1200px;height:660px;border-radius:3px;
+  background:
+    linear-gradient(to bottom, transparent 33.1%, rgba(110,80,35,.16) 33.3%, rgba(255,255,255,.4) 33.7%, transparent 34.6%, transparent 65.9%, rgba(110,80,35,.14) 66.1%, rgba(255,255,255,.35) 66.5%, transparent 67.4%),
+    radial-gradient(ellipse at 50% 38%, #fbf3dc 0%, #f3e6c6 62%, #e5d1a1 100%);
+  box-shadow:
+    0 40px 80px rgba(0,0,0,.6), 0 8px 18px rgba(0,0,0,.4),
+    inset 0 0 90px rgba(150,105,40,.38), inset 0 0 0 1px rgba(120,85,35,.22);
+}
+.paper::before{
+  content:"";position:absolute;inset:0;border-radius:3px;opacity:.55;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .33  0 0 0 0 .16  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.paper::after{ /* manchas de tiempo */
+  content:"";position:absolute;inset:0;border-radius:3px;pointer-events:none;
+  background:
+    radial-gradient(160px 110px at 12% 88%, rgba(150,100,40,.13), transparent 70%),
+    radial-gradient(220px 140px at 92% 12%, rgba(150,100,40,.12), transparent 70%);
+}
+
+/* ── transiciones de hoja: la hoja se levanta por el borde izquierdo como al pasar página ── */
+.in-right{animation:inR .8s cubic-bezier(.2,.8,.2,1) both}
+.in-left{animation:inL .6s cubic-bezier(.2,.8,.2,1) both}
+.out-left{transform-origin:40px 50%;animation:outL .9s cubic-bezier(.55,0,.75,.35) both;pointer-events:none}
+.out-right{animation:outR .7s cubic-bezier(.5,0,.8,.4) both;pointer-events:none}
+@keyframes inR{from{transform:translate3d(90px,50px,-120px) rotate(3deg);opacity:0}to{transform:none;opacity:1}}
+@keyframes inL{from{transform:translate(-90px,20px) rotate(-3deg);opacity:0}to{transform:none;opacity:1}}
+@keyframes outL{40%{filter:brightness(.92)}to{transform:rotateY(-82deg) translate3d(-60px,-40px,60px) rotate(-4deg);opacity:0;filter:brightness(.55)}}
+@keyframes outR{to{transform:translate(240px,40px) rotate(6deg);opacity:0}}
+
+/* ── tinta ── */
+.stuff{position:absolute;inset:0}
+.ln{
+  position:absolute;white-space:pre;color:var(--ink);pointer-events:none;
+  text-shadow:0 0 .6px rgba(10,16,40,.9), 0 1px 1.4px rgba(10,16,40,.35);
+  mask-repeat:no-repeat;-webkit-mask-repeat:no-repeat;
+  transition:color 2.8s ease, text-shadow 2.8s ease;
+}
+.ln.dry{color:var(--ink-dry);text-shadow:0 0 .5px rgba(30,45,95,.55)}
+/* línea que se está escribiendo: tinta húmeda, más oscura y con un leve brillo */
+.inkline{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.inkfill{fill:var(--ink)}
+.pen{position:absolute;left:0;top:0;width:244px;height:32px;margin:-16px 0 0 -4px;transform-origin:4px 16px;pointer-events:none;z-index:35;transition:opacity .35s}
+.pen svg{display:block}
+.pen.away{opacity:0}
+
+/* ── obstáculos ── */
+.obst{position:absolute;left:0;top:0;will-change:transform;touch-action:none}
+.page.done .obst{cursor:grab}
+.obst.held{cursor:grabbing;z-index:30}
+.obst.held .art,.obst.held.photo{filter:drop-shadow(0 18px 18px rgba(0,0,0,.35))}
+.photo{
+  background:#fbf7ea;padding:10px 10px 38px;border-radius:2px;
+  box-shadow:0 14px 26px rgba(0,0,0,.38),0 2px 4px rgba(0,0,0,.3);
+}
+/* la sombra se aleja y se difumina cuanto más alto vuela el objeto (--lift 0..1 desde app.js) */
+.photo{box-shadow:0 calc(14px + 46px*var(--lift,0)) calc(26px + 34px*var(--lift,0)) rgba(0,0,0,calc(.38 - .16*var(--lift,0))),0 2px 4px rgba(0,0,0,calc(.3 - .3*var(--lift,0)))}
+.doodle .art{filter:drop-shadow(0 calc(36px*var(--lift,0)) calc(3px + 12px*var(--lift,0)) rgba(40,25,10,calc(.28*var(--lift,0))))}
+.doodle .art svg{filter:url(#pencil)}
+.dd.hatch{stroke-width:1.7;opacity:.82;animation-duration:2s!important}
+.page.done .photo:hover{box-shadow:0 22px 38px rgba(0,0,0,.42),0 3px 6px rgba(0,0,0,.3)}
+/* la foto se "revela" como una instantánea: empieza lechosa y toma color */
+.photo img{width:100%;height:100%;object-fit:cover;display:block;border-radius:1px;background:#d9cdb0;
+  filter:sepia(.6) brightness(1.9) contrast(.55) blur(1.5px);transition:filter 3.2s cubic-bezier(.3,.1,.3,1) .3s}
+.obst.photo.drawn img{filter:sepia(.28) saturate(.9) contrast(1.02)}
+.photo .gloss{position:absolute;left:10px;right:10px;top:10px;bottom:38px;overflow:hidden;pointer-events:none}
+.photo .gloss::after{content:"";position:absolute;top:-20%;bottom:-20%;width:45%;left:-60%;transform:skewX(-18deg);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.38),transparent)}
+.obst.photo.drawn .gloss::after{animation:gloss 1.6s ease-in-out 2.4s both}
+@keyframes gloss{to{left:130%}}
+.photo.nophoto img{visibility:hidden}
+.photo.nophoto::before{content:"{{photo}}";position:absolute;left:10px;right:10px;top:10px;bottom:38px;display:grid;place-items:center;
+  background:repeating-linear-gradient(45deg,#e6dcc2,#e6dcc2 8px,#ded2b4 8px,#ded2b4 16px);color:#8a7a56;font:400 16px 'Homemade Apple'}
+.tape{position:absolute;left:50%;top:-14px;width:84px;height:28px;margin-left:-42px;transform:rotate(-3deg);z-index:2;
+  background:linear-gradient(90deg,rgba(226,204,150,.82),rgba(240,222,176,.78));box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.cap{position:absolute;left:0;right:0;bottom:9px;text-align:center;font:400 15px/1 'Homemade Apple';color:#3b3550;pointer-events:none;white-space:nowrap}
+.doodle .art{width:100%;height:100%;display:block}
+.doodle .art svg{width:100%;height:100%;overflow:visible}
+.doodle .cap{bottom:-28px;color:var(--ink-dry);font-size:16px}
+.dd{stroke:var(--ink);stroke-width:3.4;fill:none;stroke-dasharray:1;stroke-dashoffset:1}
+.dd.acc{stroke:var(--accent)}
+.obst.drawn .dd{animation:draw 1.5s cubic-bezier(.5,0,.2,1) forwards;animation-delay:calc(var(--i,0)*.14s)}
+@keyframes draw{to{stroke-dashoffset:0}}
+.obst.doodle .cap{opacity:0;transition:opacity 1s 1s}
+.obst.doodle.drawn .cap{opacity:1}
+
+.flourish{position:absolute;pointer-events:none}
+.flourish svg{width:100%;height:100%;overflow:visible}
+.flourish .dd{stroke:var(--accent);stroke-width:3.6}
+.flourish.go .dd{animation:draw 1.6s cubic-bezier(.5,0,.2,1) forwards}
+
+/* ── remates de animación ── */
+
+.spark{position:absolute;pointer-events:none;z-index:30;width:7px;height:7px;margin:-3px;border-radius:50%;background:var(--ink);animation:spark var(--t,1s) ease-out forwards}
+.spark.acc{background:var(--accent)}
+.spark.puff{width:14px;height:14px;margin:-7px;background:rgba(200,170,120,.5);filter:blur(3px)}
+.shard{position:fixed;z-index:70;width:var(--s);height:var(--s);pointer-events:none;
+  background:radial-gradient(circle at 35% 30%,#e06a5c,#9b2a22 60%,#5e130e);clip-path:polygon(50% 0,100% 38%,74% 100%,12% 84%,0 30%);
+  animation:shardX 1.4s cubic-bezier(.15,.7,.4,1) forwards}
+@keyframes shardX{
+  0%{transform:translate(-50%,-50%) rotate(0)}
+  35%{transform:translate(calc(-50% + var(--dx)*.75),calc(-50% + var(--dy)*.75)) rotate(calc(var(--r)*.4))}
+  100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy) + var(--fall))) rotate(var(--r));opacity:0}}
+.spark.petal,.petal.fall{width:15px;height:10px;border-radius:100% 0 100% 0;background:var(--accent);opacity:.85}
+@keyframes spark{0%{opacity:1;transform:translate(0,0) rotate(0) scale(1)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--r)) scale(.3)}}
+.ring{position:absolute;pointer-events:none;z-index:29;border:2px solid var(--accent);border-radius:50%;transform:translate(-50%,-50%) scale(.1);opacity:0;animation:ring 1.6s ease-out forwards}
+@keyframes ring{0%{opacity:.9;transform:translate(-50%,-50%) scale(.1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1)}}
+.reticle{position:absolute;pointer-events:none;z-index:31;width:220px;height:220px;margin:-110px;animation:ret 3.2s ease-in-out forwards}
+.reticle svg{width:100%;height:100%;stroke:var(--accent);stroke-width:2.6;animation:spin 6s linear infinite}
+@keyframes ret{0%{opacity:0;transform:scale(2.2)}18%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(.9)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.petal.fall{position:absolute;top:-30px;pointer-events:none;z-index:2;animation:petalfall linear infinite}
+@keyframes petalfall{0%{transform:translate(0,0) rotate(0)}50%{transform:translate(var(--sx),380px) rotate(200deg)}100%{transform:translate(calc(var(--sx)*-.6),780px) rotate(420deg)}}
+.flash{position:absolute;inset:0;pointer-events:none;z-index:40;background:radial-gradient(circle at 70% 18%,#fff 0,rgba(255,255,255,.85) 30%,rgba(255,255,255,0) 75%);animation:flash .9s ease-out forwards}
+@keyframes flash{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
+.obst.pulse .art{animation:pulse .6s cubic-bezier(.3,1.6,.5,1)}
+@keyframes pulse{0%{transform:scale(1.22)}100%{transform:scale(1)}}
+
+/* ── sello de lacre ── */
+.seal{position:absolute;width:96px;height:96px;margin:-48px 0 0 -48px;border-radius:50%;display:grid;place-items:center;
+  font:400 44px 'Homemade Apple';color:#f5c6b8;padding-bottom:6px;
+  background:radial-gradient(circle at 35% 30%,#d4574a,#9b2a22 55%,#6e1812 100%);
+  box-shadow:0 8px 14px rgba(0,0,0,.45),inset 0 -5px 9px rgba(60,5,5,.55),inset 0 4px 7px rgba(255,170,150,.35),0 0 0 6px rgba(150,30,25,.55);
+  text-shadow:0 1px 0 rgba(60,5,5,.7);z-index:15;overflow:hidden}
+.seal::after{content:"";position:absolute;inset:-30%;background:linear-gradient(115deg,transparent 40%,rgba(255,220,200,.45) 50%,transparent 60%);
+  transform:translateX(-80%);animation:shine 4.5s ease-in-out 1.5s infinite}
+@keyframes shine{0%,60%{transform:translateX(-80%)}85%,100%{transform:translateX(80%)}}
+.seal.stamp{animation:stamp .7s cubic-bezier(.2,1.4,.4,1) .5s both}
+@keyframes stamp{from{transform:scale(2.4) rotate(-18deg);opacity:0}60%{opacity:1}to{transform:scale(1) rotate(-6deg);opacity:1}}
+
+/* ── puntos de avance / pista ── */
+#dots{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:10px;z-index:60;pointer-events:none}
+.dot{width:7px;height:7px;border-radius:4px;background:rgba(255,226,170,.22);transition:all .5s cubic-bezier(.3,1.4,.5,1)}
+.dot.seen{background:rgba(255,216,154,.5)}
+.dot.on{width:26px;background:#ffd89a;box-shadow:0 0 12px rgba(255,200,120,.85)}
+#hint{position:fixed;right:22px;bottom:14px;z-index:60;color:rgba(255,226,170,.55);font:400 15px 'Homemade Apple';opacity:0;transition:opacity 1s;pointer-events:none}
+#hint.show{opacity:1}
+
+/* ── sobre de portada: la primera hoja ya está dentro y sale de él ── */
+#cover{position:absolute;inset:0;z-index:6;display:grid;place-items:center;cursor:pointer}
+.env{position:relative;width:560px;height:360px;margin-top:50px;animation:bob 5s ease-in-out infinite}
+.shell{position:absolute;inset:0;transition:transform 1.25s cubic-bezier(.6,0,.9,.4),opacity 1s ease-in}
+@keyframes bob{50%{transform:translateY(-8px) rotate(-.4deg)}}
+#cover.open .env{animation:none}
+.env .back{position:absolute;inset:0;background:linear-gradient(160deg,#e8d6a8,#d6bf86);border-radius:5px;z-index:1;box-shadow:0 30px 50px rgba(0,0,0,.55),0 6px 12px rgba(0,0,0,.35)}
+#slot{position:absolute;left:50%;top:50%;width:0;height:0;z-index:2;transform-origin:0 0;
+  transform:translate(0,14px) scale(.4);transition:transform 1.15s cubic-bezier(.3,.8,.2,1)}
+#slot .page{inset:auto;left:-640px;top:-360px;width:1280px;height:720px}
+#cover.rise #slot{transform:translate(0,-150px) scale(.42)}
+#cover.grow #slot{z-index:20;transform:translate(0,-25px) scale(1);transition:transform 1.2s cubic-bezier(.5,0,.15,1)}
+#cover.grow .env{animation:none}
+#cover.grow .shell{transform:translateY(360px) rotate(4deg);opacity:0}
+.env .front{position:absolute;inset:0;border-radius:5px;pointer-events:none;z-index:3;
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 560 360' preserveAspectRatio='none'><path d='M0 0L280 202L560 0M0 360L246 188M560 360L314 188' stroke='rgba(110,80,35,.38)' fill='none' stroke-width='1.6'/></svg>") center/100% 100% no-repeat,
+    linear-gradient(165deg,#e9d7a8,#d3ba7f);
+  clip-path:polygon(0 0,50% 56%,100% 0,100% 100%,0 100%);box-shadow:inset 0 0 0 1px rgba(120,85,35,.18)}
+.env .flap{position:absolute;left:0;right:0;top:0;height:56%;transform-origin:top;z-index:5;
+  background:linear-gradient(#ead9ad,#d4bb7e);clip-path:polygon(0 0,100% 0,50% 100%);
+  transition:transform .8s cubic-bezier(.5,0,.3,1),z-index 0s .35s}
+.env .flap::after{content:'';position:absolute;inset:0;background:linear-gradient(rgba(255,255,255,.12),rgba(100,70,30,.12))}
+#cover.open .flap{transform:scaleY(-1);z-index:1}
+.env .to{position:absolute;left:0;right:0;bottom:46px;text-align:center;z-index:4;font:400 36px 'Homemade Apple';color:#4a3a2a;opacity:.82;transition:opacity .4s}
+#cover.open .to{opacity:0}
+.env .seal{left:50%;top:56%;z-index:6;margin:-48px 0 0 -48px;transition:transform .6s,opacity .5s}
+#cover.open .seal{transform:scale(1.5) rotate(25deg);opacity:0}
+.cover-hint{position:absolute;bottom:70px;left:0;right:0;text-align:center;color:rgba(255,226,170,.7);font:400 20px 'Homemade Apple';animation:pulse2 2.4s ease-in-out infinite;transition:opacity .4s}
+#cover.open .cover-hint{opacity:0;animation:none}
+@keyframes pulse2{50%{opacity:.35}}
+
+/* ── timbre y matasellos del sobre ── */
+/* borde dentado: el centro es opaco y en el contorno quedan medios círculos recortados */
+.stamp-post{position:absolute;right:26px;top:22px;width:72px;height:88px;z-index:4;transform:rotate(4deg);padding:4px;
+  background:#fbf3df;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,radial-gradient(circle 3.5px at 4px 4px,#0000 96%,#000) -4px -4px/8px 8px;
+          mask:linear-gradient(#000 0 0) content-box,radial-gradient(circle 3.5px at 4px 4px,#0000 96%,#000) -4px -4px/8px 8px}
+.stamp-post svg{width:100%;height:100%;display:block}
+.stamp-wrap{position:absolute;right:0;top:0;z-index:6;filter:drop-shadow(0 2px 2px rgba(0,0,0,.28))}
+.postmark{position:absolute;right:76px;top:40px;width:120px;height:70px;z-index:6;opacity:.55;transform:rotate(-12deg);pointer-events:none}
+.env .front::after{content:"";position:absolute;inset:10px;border:1.5px dashed rgba(160,110,50,.28);border-radius:3px}
+
+@media (prefers-reduced-motion:reduce){
+  body::before,.env,.cover-hint,.seal::after,.petal.fall{animation:none}
+  .out-left{animation-name:outR}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="pencil"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="3"/><feDisplacementMap in="SourceGraphic" scale="2.2"/></filter></svg>
+<canvas id="dust"></canvas>
+<div id="stage">
+  <div id="pages"></div>
+  <div id="cover">
+    <div class="env">
+      <div class="shell">
+        <div class="back"></div>
+        <div class="front"></div>
+        <div class="to">{{to}}</div>
+        <div class="stamp-wrap"><div class="stamp-post"><svg viewBox="0 0 64 80" fill="none" stroke-linecap="round">
+          <rect width="64" height="80" fill="#2c3d72"/>
+          <g fill="#ffe2a6"><circle cx="10" cy="12" r="1.2"/><circle cx="52" cy="9" r="1"/><circle cx="46" cy="26" r="1.3"/><circle cx="14" cy="34" r=".9"/><circle cx="56" cy="44" r="1"/></g>
+          <circle cx="32" cy="40" r="13" fill="#d8573f"/><path d="M19 40a13 13 0 0 0 26 0" fill="#a8472f"/>
+          <ellipse cx="32" cy="40" rx="22" ry="5.5" stroke="#ffe2a6" stroke-width="2" transform="rotate(-16 32 40)"/>
+          <text x="32" y="72" fill="#ffe2a6" font-family="Homemade Apple" font-size="8" text-anchor="middle">Mexique</text>
+        </svg></div></div>
+        <svg class="postmark" viewBox="0 0 120 70" fill="none" stroke="#3b2a4a" stroke-width="1.6">
+          <circle cx="34" cy="35" r="27"/><circle cx="34" cy="35" r="20"/>
+          <text x="34" y="39" fill="#3b2a4a" stroke="none" font-family="Homemade Apple" font-size="9" text-anchor="middle">Pachuca</text>
+          <path d="M66 20q8-5 16 0t16 0t16 0M66 35q8-5 16 0t16 0t16 0M66 50q8-5 16 0t16 0t16 0"/>
+        </svg>
+        <div class="flap"></div>
+        <div class="seal">A</div>
+      </div>
+      <div id="slot"></div>
+    </div>
+    <div class="cover-hint">{{open}}</div>
+  </div>
+</div>
+<div id="dots"></div>
+<div id="hint">{{hint}}</div>
+<script>
+/*APP*/
+</script>
+</body>
+</html>
