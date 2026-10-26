@@ -1,7 +1,8 @@
 // Les espaces insécables ( ) évitent qu'un « ? » ou un « ; » se retrouve seul au début d'une ligne.
 const N = ' '
 export default {
-  ui: { lang: 'fr', title: 'Une lettre pour toi', description: 'Une lettre animée, écrite à la main.', to: 'Pour toi', open: 'touche pour ouvrir', hint: '→ clic, espace ou flèches', photo: 'photo' },
+  ui: { lang: 'fr', title: 'Une lettre pour toi', description: 'Une lettre animée, écrite à la main.', to: 'Pour toi', open: 'touche pour ouvrir', hint: '→ clic, espace ou flèches', hintTouch: 'touche pour continuer →', photo: 'photo',
+    reread: '↺ Relire la lettre', sound: 'Son', ogImage: 'https://richard7987.github.io/carta-fuente/og.jpg', url: 'https://richard7987.github.io/carta-fuente/' },
   t: {
     hola: 'Bonjour...',
     s2: 'Je m’appelle Alejandro, je viens du Mexique, d’une petite ville appelée Pachuca, où abondent l’ennui, les paysages boisés à 20 minutes et les pastes.',

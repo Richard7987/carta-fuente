@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>{{title}}</title>
 <meta name="description" content="{{description}}">
+<meta name="theme-color" content="#1c120d">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%239b2a22'/%3E%3Ccircle cx='32' cy='32' r='20' fill='none' stroke='%23f5c6b8' stroke-width='3' opacity='.6'/%3E%3Cpath d='M22 44L32 18L42 44M26 35H38' fill='none' stroke='%23f5c6b8' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<!-- vista previa al compartir el enlace (Instagram, WhatsApp, iMessage…) -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{url}}">
+<meta property="og:title" content="{{title}}">
+<meta property="og:description" content="{{description}}">
+<meta property="og:image" content="{{ogImage}}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{{ogImage}}">
 <style>
 :root{
   --ink:#16213f; --ink-dry:#27386a; --accent:#a8472f;
@@ -32,6 +44,7 @@ body::after{ /* viñeta */
 }
 #dust{position:fixed;inset:0;z-index:2;pointer-events:none}
 
+#view{position:fixed;inset:0;overflow:hidden;z-index:5}
 #stage{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:center;z-index:5;opacity:0;transition:opacity .8s}
 body.ready #stage{opacity:1}
 #pages,.page{position:absolute;inset:0}
@@ -52,6 +65,20 @@ body.ready #stage{opacity:1}
   content:"";position:absolute;inset:0;border-radius:3px;opacity:.55;mix-blend-mode:multiply;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .33  0 0 0 0 .16  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
+.sheet{position:absolute;inset:0}
+/* esquina doblada: el papel pierde la esquina y encima queda la solapa vista por detrás */
+.sheet:has(.p-dogear){filter:drop-shadow(0 30px 34px rgba(0,0,0,.55)) drop-shadow(0 6px 10px rgba(0,0,0,.35))}
+.paper.p-dogear{box-shadow:inset 0 0 90px rgba(150,105,40,.38),inset 0 0 0 1px rgba(120,85,35,.22);
+  clip-path:polygon(0 0,calc(100% - 74px) 0,100% 74px,100% 100%,0 100%)}
+.fold{position:absolute;top:30px;left:1166px;width:74px;height:74px;pointer-events:none;
+  background:linear-gradient(225deg,#c9ad74 0%,#ead7aa 45%,#f4e6c2 100%);clip-path:polygon(0 0,100% 100%,0 100%);
+  filter:drop-shadow(-4px 5px 5px rgba(60,35,10,.35))}
+/* marca circular de una taza de café, con un segundo anillo incompleto */
+.coffee{position:absolute;right:110px;bottom:70px;width:170px;height:170px;border-radius:50%;pointer-events:none;mix-blend-mode:multiply;
+  background:radial-gradient(circle,rgba(140,90,40,.05) 0 60%,rgba(120,70,25,.1) 63%,rgba(115,65,20,.28) 67%,rgba(120,70,25,.12) 69.5%,transparent 71%)}
+.coffee::after{content:"";position:absolute;inset:0;border-radius:50%;transform:translate(16px,-10px) scale(.96);
+  background:radial-gradient(circle,transparent 64%,rgba(115,65,20,.2) 67%,transparent 70%);
+  -webkit-mask:conic-gradient(#000 0 140deg,transparent 200deg 330deg,#000 360deg);mask:conic-gradient(#000 0 140deg,transparent 200deg 330deg,#000 360deg)}
 .paper::after{ /* manchas de tiempo */
   content:"";position:absolute;inset:0;border-radius:3px;pointer-events:none;
   background:
@@ -84,6 +111,9 @@ body.ready #stage{opacity:1}
 .pen{position:absolute;left:0;top:0;width:244px;height:32px;margin:-16px 0 0 -4px;transform-origin:4px 16px;pointer-events:none;z-index:35;transition:opacity .35s}
 .pen svg{display:block}
 .pen.away{opacity:0}
+.blot{position:absolute;pointer-events:none;opacity:.9;background:radial-gradient(circle at 40% 35%,#2c3a68,var(--ink) 65%);
+  animation:blot .45s cubic-bezier(.2,.9,.3,1) both}
+@keyframes blot{from{transform:scale(.15)}}
 
 /* ── obstáculos ── */
 .obst{position:absolute;left:0;top:0;will-change:transform;touch-action:none}
@@ -151,7 +181,7 @@ body.ready #stage{opacity:1}
 @keyframes ret{0%{opacity:0;transform:scale(2.2)}18%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(.9)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 .petal.fall{position:absolute;top:-30px;pointer-events:none;z-index:2;animation:petalfall linear infinite}
-@keyframes petalfall{0%{transform:translate(0,0) rotate(0)}50%{transform:translate(var(--sx),380px) rotate(200deg)}100%{transform:translate(calc(var(--sx)*-.6),780px) rotate(420deg)}}
+@keyframes petalfall{0%{transform:translate(0,0) rotate(0)}50%{transform:translate(var(--sx),calc(var(--fy,780px)*.49)) rotate(200deg)}100%{transform:translate(calc(var(--sx)*-.6),var(--fy,780px)) rotate(420deg)}}
 .flash{position:absolute;inset:0;pointer-events:none;z-index:40;background:radial-gradient(circle at 70% 18%,#fff 0,rgba(255,255,255,.85) 30%,rgba(255,255,255,0) 75%);animation:flash .9s ease-out forwards}
 @keyframes flash{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
 .obst.pulse .art{animation:pulse .6s cubic-bezier(.3,1.6,.5,1)}
@@ -176,6 +206,38 @@ body.ready #stage{opacity:1}
 .dot.on{width:26px;background:#ffd89a;box-shadow:0 0 12px rgba(255,200,120,.85)}
 #hint{position:fixed;right:22px;bottom:14px;z-index:60;color:rgba(255,226,170,.55);font:400 15px 'Homemade Apple';opacity:0;transition:opacity 1s;pointer-events:none}
 #hint.show{opacity:1}
+.h-touch{display:none}
+@media (pointer:coarse){.h-touch{display:inline}.h-mouse{display:none}}
+
+/* ── botones: releer la carta y sonido ── */
+#reread{position:fixed;left:50%;bottom:44px;transform:translate(-50%,10px);z-index:60;opacity:0;pointer-events:none;cursor:pointer;
+  font:400 19px 'Homemade Apple';color:#ffe2aa;padding:12px 24px 8px;white-space:nowrap;border-radius:30px;
+  background:rgba(40,24,14,.72);border:1px solid rgba(255,216,154,.4);box-shadow:0 6px 24px rgba(0,0,0,.4),0 0 18px rgba(255,190,110,.15);
+  transition:opacity .8s,transform .8s cubic-bezier(.2,1.3,.4,1),box-shadow .3s}
+#reread.show{opacity:1;pointer-events:auto;transform:translate(-50%,0)}
+#reread:hover{box-shadow:0 6px 24px rgba(0,0,0,.4),0 0 26px rgba(255,190,110,.4)}
+#mute{position:fixed;left:14px;bottom:8px;z-index:60;width:40px;height:40px;border:0;border-radius:50%;cursor:pointer;
+  background:rgba(40,24,14,.45);color:rgba(255,226,170,.75);display:grid;place-items:center;opacity:0;pointer-events:none;transition:opacity 1s}
+#mute.show{opacity:1;pointer-events:auto}
+#mute svg{width:22px;height:22px}
+#mute .x{display:none}
+#mute.off .x{display:inline}
+#mute.off .w{display:none}
+#reread:focus-visible,#mute:focus-visible{outline:2px solid #ffd89a;outline-offset:3px}
+
+/* ── versión vertical (móvil): escenario de 720×1280 ── */
+body.portrait #stage{width:720px;height:1280px}
+body.portrait .paper{left:20px;top:30px;width:680px;height:1220px}
+body.portrait .fold{left:626px}
+body.portrait .out-left{transform-origin:20px 50%}
+body.portrait #slot{transform:translate(0,14px) scale(.25)}
+body.portrait #slot .page{left:-360px;top:-640px;width:720px;height:1280px}
+body.portrait #cover.rise #slot{transform:translate(0,-175px) scale(.3)}
+body.portrait #cover.grow #slot{transform:translate(0,-25px) scale(1)}
+body.portrait .cover-hint{bottom:300px;font-size:26px}
+body.portrait .coffee{right:60px;bottom:120px}
+body.portrait #reread{bottom:auto;top:max(18px,env(safe-area-inset-top))}
+body.portrait #hint{left:0;right:0;text-align:center;bottom:40px}
 
 /* ── sobre de portada: la primera hoja ya está dentro y sale de él ── */
 #cover{position:absolute;inset:0;z-index:6;display:grid;place-items:center;cursor:pointer}
@@ -229,7 +291,7 @@ body.ready #stage{opacity:1}
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="pencil"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="3"/><feDisplacementMap in="SourceGraphic" scale="2.2"/></filter></svg>
 <canvas id="dust"></canvas>
-<div id="stage">
+<div id="view"><div id="stage">
   <div id="pages"></div>
   <div id="cover">
     <div class="env">
@@ -257,8 +319,13 @@ body.ready #stage{opacity:1}
     <div class="cover-hint">{{open}}</div>
   </div>
 </div>
+</div>
 <div id="dots"></div>
-<div id="hint">{{hint}}</div>
+<div id="hint"><span class="h-mouse">{{hint}}</span><span class="h-touch">{{hintTouch}}</span></div>
+<button id="reread" type="button">{{reread}}</button>
+<button id="mute" type="button" aria-label="{{sound}}" title="{{sound}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke="none"/>
+  <path class="w" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="x" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
 <script>
 /*APP*/
 </script>

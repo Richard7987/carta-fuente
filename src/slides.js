@@ -47,6 +47,7 @@ export const slides = [
 
   // 4 ── pregunta filosófica
   {
+    paper: 'coffee',   // marca de taza de café
     blocks: [{ text: T.s4, font: INK(60), lh: 100, align: 'center', valign: 'middle',
       box: { x: 160, y: 90, w: 960, h: 540 }, speed: 9 }],
     flourish: { vb: '0 0 420 40', x: 430, y: 520, w: 420, h: 40,
@@ -75,6 +76,7 @@ export const slides = [
 
   // 7 ── Intereses   (hero: la cámara llega, hace "clic" y destella)
   {
+    paper: 'dogear',   // esquina doblada
     blocks: [{
       text: T.s7,
       font: INK(28), lh: 48, box: { x: 120, y: 90, w: 1040, h: 540 }, speed: 24 }],
@@ -114,5 +116,46 @@ export const slides = [
       { kind: 'doodle', id: 'stars', w: 150, h: 90, x: 120, y: 540, rot: -4, from: [-400, 300], delay: 0, drift: drift(18, 10, 0.5, 0.7, 1) },
     ],
     seal: { x: 1170, y: 600 }, rain: true,
+    portrait: { blocks: [{ box: { x: 70, y: 84, w: 580, h: 960 } }, { box: { x: 110, y: 1100, w: 420, h: 110 }, f: 1 }], seal: { x: 618, y: 1172 } },
   },
 ]
+
+// ─────────────────────────────────────────────────────────────
+//  VERSIÓN VERTICAL (móvil): escenario de 720×1280, papel de x 20..700, y 30..1250.
+//  Cada hoja se traslada sola desde la horizontal; `portrait` en una hoja permite
+//  corregir a mano cajas de texto (blocks[i].box, blocks[i].f = factor de letra) o el sello.
+// ─────────────────────────────────────────────────────────────
+const PW = 720, PH = 1280, K = 0.8   // K: los objetos se encogen un poco para dejar sitio al texto
+const PX = (x) => 20 + (x - 40) * (680 / 1200)
+const PY = (y) => 30 + (y - 30) * (1220 / 660)
+
+function portraitOf(s) {
+  const p = s.portrait || {}
+  const blocks = s.blocks.map((b, i) => {
+    const o = p.blocks?.[i] || {}
+    const centered = b.align === 'center'
+    const px = +b.font.match(/([\d.]+)px/)[1]
+    const f = o.f ?? (centered ? (px > 100 ? 0.6 : 0.8) : 1)
+    const box = o.box || (centered ? { x: 70, y: 110, w: 580, h: 1060 } : { x: 70, y: 84, w: 580, h: 1120 })
+    return { ...b, font: INK(+(px * f).toFixed(1)), lh: b.lh * f, box }
+  })
+  const obstacles = (s.obstacles || []).map((o) => {
+    const w = o.w * K, h = o.h * K
+    // se traslada el centro del objeto y se mantiene dentro del papel
+    const at = (x, y) => [
+      Math.min(Math.max(PX(x + o.w / 2) - w / 2, 28), PW - 28 - w),
+      Math.min(Math.max(PY(y + o.h / 2) - h / 2, 40), PH - 40 - h),
+    ]
+    const [x, y] = at(o.x, o.y)
+    const q = { ...o, w, h, x, y, pad: (o.pad ?? (o.kind === 'photo' ? 30 : 22)) * K }
+    if (o.from) q.from = [o.from[0] * 0.6, o.from[1] * 1.4]
+    if (o.drift) q.drift = { ...o.drift, ax: o.drift.ax * 0.6, ay: o.drift.ay * 0.6 }
+    if (o.hero) q.hero = { ...o.hero, keys: o.hero.keys.map(([t, kx, ky, r]) => [t, ...at(kx, ky), r]) }
+    return q
+  })
+  const fl = s.flourish && { ...s.flourish, w: s.flourish.w * 0.6, x: PW / 2 - s.flourish.w * 0.3, y: PH / 2 + 95 }
+  const seal = p.seal || (s.seal && { x: PX(s.seal.x), y: PY(s.seal.y) })
+  return { ...s, blocks, obstacles, flourish: fl, seal, paperW: PW }
+}
+
+export const slidesFor = (portrait) => (portrait ? slides.map(portraitOf) : slides)

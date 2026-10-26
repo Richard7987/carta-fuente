@@ -1,9 +1,9 @@
 import { prepareWithSegments, layoutNextLineRange, materializeLineRange } from '@chenglou/pretext'
-import { slides } from './slides.js'
+import { slidesFor } from './slides.js'
 import { doodles, sketch } from './doodles.js'
 import { loadFont, inkLine } from './ink.js'
+import * as audio from './audio.js'
 
-const W = 1280, H = 720
 const stage = document.getElementById('stage')
 const pagesEl = document.getElementById('pages')
 const dotsEl = document.getElementById('dots')
@@ -23,13 +23,19 @@ const easeOutBack = (t) => { const c1 = 1.4, c3 = c1 + 1; return 1 + c3 * Math.p
 const smooth = (t) => t * t * (3 - 2 * t)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-/* ───────── escala del escenario ───────── */
-let scale = 1
+/* ───────── escala del escenario: hoja horizontal (1280×720) o vertical en móvil (720×1280) ───────── */
+let scale = 1, portrait = null, W = 1280, H = 720, slides = slidesFor(false)
 function fit() {
+  const p = innerHeight > innerWidth * 1.1
+  if (p !== portrait) {
+    portrait = p; W = p ? 720 : 1280; H = p ? 1280 : 720; slides = slidesFor(p)
+    document.body.classList.toggle('portrait', p)
+    // al girar el teléfono la hoja actual se recompone ya escrita en el nuevo formato
+    if (current && !opening) go(idx, 1, true)
+  }
   scale = Math.min(innerWidth / W, innerHeight / H)
   stage.style.transform = `translate(-50%,-50%) scale(${scale})`
 }
-addEventListener('resize', fit); fit()
 const toStage = (ev) => {
   const r = stage.getBoundingClientRect()
   return { x: (ev.clientX - r.left) / scale, y: (ev.clientY - r.top) / scale }
@@ -110,7 +116,11 @@ class Slide {
   constructor(def, index) {
     this.def = def; this.index = index
     this.page = mk('page')
-    mk('paper', this.page)
+    // ninguna hoja queda perfectamente recta; algunas traen su propia historia (café, esquina doblada)
+    this.page.style.rotate = ((index * 0.37) % 0.8 - 0.4).toFixed(2) + 'deg'
+    const paper = mk('paper' + (def.paper ? ' p-' + def.paper : ''), mk('sheet', this.page))
+    if (def.paper === 'coffee') mk('coffee', paper)
+    if (def.paper === 'dogear') mk('fold', this.page)
     this.stuff = mk('stuff', this.page)
     this.state = 'idle'; this.dead = false; this.skip = false
     this.calm = false; this.reflow = false; this.driftOn = false
@@ -176,6 +186,7 @@ class Slide {
       if (this.skip) { this.settleNow(ob); return res() }
       ob.state = 'hero'; ob.t0 = performance.now(); ob.onDone = res
       ob.node.classList.add('drawn')
+      audio.sfx.pencil(1.6)
     })
   }
   /* actualiza la posición visual de cada obstáculo en cada fotograma */
@@ -218,6 +229,13 @@ class Slide {
         o.x = o.bx + o.lastDrift[0]; o.y = o.by + o.lastDrift[1]
         vx = o.x; vy = o.y; vr = o.rot; op = 1
       } else if (o.drag) { vx = o.x; vy = o.y; vr = o.rot; op = 1; lift = 0.6 }
+      // al arrastrar, el objeto se inclina en 3D hacia donde se mueve y vuelve despacio al soltarlo
+      if (o.state === 'rest') {
+        o.tiltX = (o.tiltX || 0) + (Math.max(-28, Math.min(28, -(o.dvy || 0) * 2.2)) - (o.tiltX || 0)) * 0.18
+        o.tiltY = (o.tiltY || 0) + (Math.max(-28, Math.min(28, (o.dvx || 0) * 2.2)) - (o.tiltY || 0)) * 0.18
+        o.dvx = (o.dvx || 0) * 0.82; o.dvy = (o.dvy || 0) * 0.82
+        tx = o.tiltX; ty = o.tiltY
+      }
       // rebote amortiguado al tocar el papel (se aplasta y recupera)
       let sx = 1, sy = 1
       if (o.impact) {
@@ -239,6 +257,8 @@ class Slide {
   land(o, now) {
     o.impact = now
     if (this.skip) return
+    audio.sfx.tap(o.def.kind === 'photo')
+    if (o.def.kind === 'doodle') audio.sfx.pencil(1.5, 0.1)
     const y = o.y + o.h
     for (let i = 0; i < 12; i++) {
       const side = i % 2 ? 1 : -1, x = o.x + o.w / 2 + side * (o.w * 0.2 + Math.random() * o.w * 0.3)
@@ -270,7 +290,9 @@ class Slide {
       for (let i = 0; i < 34; i++) { const a = (i / 34) * 6.283, d = 90 + Math.random() * 170
         this.spark(i % 3 ? 'petal' : 'dot acc', cx, cy, Math.cos(a) * d, Math.sin(a) * d + 40, 1.8 + Math.random()) }
     }
+    if (kind !== 'flash') audio.sfx.tap()
     if (kind === 'flash') {
+      audio.sfx.shutter()
       const f = mk('flash', this.page)
       setTimeout(() => f.remove(), 900)
     }
@@ -288,7 +310,9 @@ class Slide {
     })
     ob.node.addEventListener('pointermove', (ev) => {
       if (!ob.drag) return
-      const p = toStage(ev); ob.x = p.x - ob.gx; ob.y = p.y - ob.gy
+      const p = toStage(ev), nx = p.x - ob.gx, ny = p.y - ob.gy
+      ob.dvx = (ob.dvx || 0) * 0.5 + (nx - ob.x) * 0.5; ob.dvy = (ob.dvy || 0) * 0.5 + (ny - ob.y) * 0.5
+      ob.x = nx; ob.y = ny
     })
     const up = () => {
       if (!ob.drag) return
@@ -396,14 +420,18 @@ class Slide {
       const px = parseFloat(block.cur.font.match(/([\d.]+)px/)[1])
       const asc = m.fontBoundingBoxAscent, desc = m.fontBoundingBoxDescent
       const baseline = L.y + (block.cur.lh - asc - desc) / 2 + asc
-      const line = inkLine(this.stuff, L.text, L.x, baseline, px, block.def.speed || 14)
+      // las gotas de tinta solo caen en textos que no se recolocan (si no, quedarían fuera de su letra)
+      const still = !block.avoid || !this.obstacles.length
+      const line = inkLine(this.stuff, L.text, L.x, baseline, px, block.def.speed || 14, still ? 0.2 : 0)
       this.penSize = Math.min(1.6, Math.max(0.85, px / 36))
       const t0 = performance.now() + 90
+      let bi = 0
       const end = () => { line.remove(); this.revealFull(span); res() }
       const step = (now) => {
-        if (this.dead) { line.remove(); return res() }
+        if (this.dead) { line.remove(); audio.pen(0); return res() }
         if (this.skip) { this.penAt(null); return end() }
         const t = now - t0
+        while (bi < line.blots.length && t >= line.blots[bi].t) this.blot(line.blots[bi++], px)
         this.penAt(line.draw(Math.max(0, t)), now)
         if (t >= line.total) return end()
         requestAnimationFrame(step)
@@ -420,13 +448,30 @@ class Slide {
       this.pen.innerHTML = PEN_SVG
     }
     const p = this.pen
-    if (!tip) { p.classList.add('away'); return }
+    if (!tip) { p.classList.add('away'); audio.pen(0); this.lastTip = null; return }
     p.classList.remove('away')
+    // el roce suena más cuanto más rápido corre la punta, y calla cuando se levanta
+    const lt = this.lastTip
+    const speed = lt && now > lt.now ? Math.hypot(tip.x - lt.x, tip.y - lt.y) / (now - lt.now) : 0
+    audio.pen(tip.lift > 0.3 ? 0 : Math.min(1, speed / 0.35))
+    this.lastTip = { x: tip.x, y: tip.y, now }
     const lift = tip.lift, s = this.penSize
     const ang = 36 + Math.sin(now / 210) * 2.5 - lift * 4
     p.style.transform = `translate(${tip.x.toFixed(1)}px,${(tip.y - lift * 10 * s).toFixed(1)}px) rotate(${ang.toFixed(2)}deg) scale(${(s * (1 + lift * 0.05)).toFixed(3)})`
     const d = (3 + lift * 12).toFixed(1)
     p.style.filter = `drop-shadow(${d}px ${(+d * 1.6).toFixed(1)}px ${(2 + lift * 5).toFixed(1)}px rgba(30,18,6,${(0.38 - lift * 0.14).toFixed(2)}))`
+  }
+
+  /* gota de tinta: se extiende un instante en el papel; a veces salpica una gotita al lado */
+  blot(b, px) {
+    const r = px * (0.06 + Math.random() * 0.05)
+    const add = (x, y, s) => {
+      const e = mk('blot', this.stuff)
+      const br = Array.from({ length: 4 }, () => 40 + Math.round(Math.random() * 25) + '%').join(' ')
+      e.style.cssText = `left:${(x - s).toFixed(1)}px;top:${(y - s).toFixed(1)}px;width:${(s * 2).toFixed(1)}px;height:${(s * 2 * (0.8 + Math.random() * 0.3)).toFixed(1)}px;border-radius:${br};rotate:${Math.round(Math.random() * 180)}deg`
+    }
+    add(b.x, b.y, r)
+    if (Math.random() < 0.5) { const a = Math.random() * 6.283, d = r * (1.8 + Math.random()); add(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d, r * 0.3) }
   }
 
   finish() {
@@ -445,16 +490,22 @@ class Slide {
       const s = mk('seal stamp', this.stuff)
       s.style.left = this.def.seal.x + 'px'; s.style.top = this.def.seal.y + 'px'; s.textContent = 'A'
       setTimeout(() => { if (this.dead) return
+        audio.sfx.stamp()
         this.ring(this.def.seal.x, this.def.seal.y, 220)
         for (let i = 0; i < 18; i++) { const a = (i / 18) * 6.283; this.spark('dot acc', this.def.seal.x, this.def.seal.y, Math.cos(a) * 120, Math.sin(a) * 120, 1.2) } }, 750)
     }
     if (this.def.rain) {
       for (let i = 0; i < 18; i++) {
         const e = mk('petal fall', this.stuff)
-        e.style.cssText = `left:${60 + Math.random() * 1120}px;--sx:${(Math.random() - .5) * 160}px;animation-duration:${7 + Math.random() * 6}s;animation-delay:${-Math.random() * 12}s`
+        e.style.cssText = `left:${60 + Math.random() * (W - 160)}px;--sx:${(Math.random() - .5) * 160}px;--fy:${H + 60}px;animation-duration:${(7 + Math.random() * 6) * H / 720}s;animation-delay:${-Math.random() * 12}s`
       }
     }
     hintEl.classList.toggle('show', this.index === 0)
+    if (this.index === slides.length - 1) {
+      // última hoja: se recuerda que la carta ya se leyó y se ofrece leerla otra vez desde el principio
+      try { localStorage.setItem('carta-lue', '1') } catch {}
+      setTimeout(() => { if (!this.dead) rereadEl.classList.add('show') }, this.skip ? 300 : 2600)
+    }
     this.t0 = performance.now()
     this.driftOn = true
   }
@@ -469,7 +520,7 @@ class Slide {
     for (const b of this.blocks) if (b.avoid && b.written) this.paint(b, this.layoutBlock(b))
   }
 
-  destroy() { this.dead = true; cancelAnimationFrame(this.raf) }
+  destroy() { this.dead = true; cancelAnimationFrame(this.raf); audio.pen(0) }
   leave(dir) {
     this.destroy(); this.page.classList.add(dir > 0 ? 'out-left' : 'out-right')
     setTimeout(() => this.page.remove(), 900)
@@ -478,6 +529,18 @@ class Slide {
 
 /* ───────── navegación ───────── */
 let current = null, idx = -1, opening = false, calm = false
+addEventListener('resize', fit); fit()
+
+// si ya la leyó otra vez, al volver todo aparece escrito sin esperar (el botón "Relire" la anima de nuevo)
+let fast = false
+try { fast = localStorage.getItem('carta-lue') === '1' } catch {}
+
+const rereadEl = document.getElementById('reread'), muteEl = document.getElementById('mute')
+rereadEl.addEventListener('click', () => { rereadEl.classList.remove('show'); fast = false; go(0, -1) })
+const paintMute = () => muteEl.classList.toggle('off', audio.isMuted())
+muteEl.addEventListener('click', () => { audio.start(); audio.setMuted(!audio.isMuted()); paintMute() })
+paintMute()
+
 for (let i = 0; i < slides.length; i++) mk('dot', dotsEl, 'i')
 const dotNodes = [...dotsEl.children]
 const setDots = (n) => dotNodes.forEach((d, i) => { d.classList.toggle('on', i === n); d.classList.toggle('seen', i < n) })
@@ -487,13 +550,14 @@ for (const s of slides) for (const o of s.obstacles || []) if (o.kind === 'photo
 
 async function go(n, dir = 1, instant = false) {
   if (n < 0 || n >= slides.length) return
-  if (current) current.leave(dir)
+  instant = instant || fast
+  if (current) { current.leave(dir); audio.sfx.page() }
   const s = new Slide(slides[n], n)
   s.calm = calm
   pagesEl.append(s.page)
   s.page.classList.add(dir > 0 ? 'in-right' : 'in-left')
   current = s; idx = n; setDots(n)
-  hintEl.classList.remove('show')
+  hintEl.classList.remove('show'); rereadEl.classList.remove('show')
   await sleep(instant ? 30 : 620)
   if (!s.dead) s.run(instant)
 }
@@ -520,22 +584,26 @@ function burst(x, y) {
 /* La primera hoja ya está DENTRO del sobre: sube, sale y crece hasta ocupar la pantalla. */
 async function openEnvelope() {
   opening = true
+  audio.start(); audio.music(); muteEl.classList.add('show')
   const s = new Slide(slides[0], 0)
   slotEl.append(s.page)
   current = s; idx = 0; setDots(0)
   coverEl.classList.add('open')            // se rompe el sello y se abre la solapa
+  audio.sfx.crack()
   const r = coverEl.querySelector('.env .seal').getBoundingClientRect()
   burst((r.left + r.right) / 2, (r.top + r.bottom) / 2)
   await sleep(950)
   coverEl.classList.add('rise')            // la carta asoma por arriba
+  audio.sfx.slide(1.2)
   await sleep(1250)
   coverEl.classList.add('grow')            // crece hasta el tamaño real mientras el sobre cae
+  audio.sfx.slide(0.9, 0.1)
   await sleep(1300)
   pagesEl.append(s.page)                   // pasa a la capa normal de hojas
-  s.page.removeAttribute('style')
+  s.page.style.removeProperty('transform')
   coverEl.remove()
   opening = false
-  s.run(false)
+  s.run(fast)
 }
 
 addEventListener('keydown', (e) => {
@@ -549,7 +617,7 @@ addEventListener('keydown', (e) => {
 let sx = null
 addEventListener('pointerdown', (e) => { sx = e.clientX })
 addEventListener('pointerup', (e) => {
-  if (sx == null) return
+  if (sx == null || e.target.closest('button')) return
   const dx = e.clientX - sx; sx = null
   if (Math.abs(dx) > 70) dx < 0 ? next() : prev()
   else if (!e.target.closest('.obst')) next()
@@ -601,5 +669,8 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) { requestAnimationF
 loadFont(__FONT__).then(() => document.fonts.ready).then(() => {
   document.body.classList.add('ready')
   const h = new URLSearchParams(location.search).get('s')   // ?s=N abre directamente la hoja N
-  if (h != null) { coverEl.remove(); go(+h, 1, true) }
+  if (h != null) {
+    coverEl.remove(); go(+h, 1, true); muteEl.classList.add('show')
+    addEventListener('pointerdown', () => { audio.start(); audio.music() }, { once: true })
+  }
 })

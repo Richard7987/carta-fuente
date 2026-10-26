@@ -48,7 +48,8 @@ function strokesOf(text, x, baseline, size) {
 }
 
 /* Prepara el SVG de una línea. Devuelve un objeto con draw(t) para avanzar la escritura. */
-export function inkLine(parent, text, x, baseline, size, speed) {
+export function inkLine(parent, text, x, baseline, size, speed, blotRate = 0) {
+  const blots = []
   const glyphs = strokesOf(text, x, baseline, size)
   const id = 'ink' + uid++
   const svg = el('svg', { class: 'inkline', width: 1280, height: 720, viewBox: '0 0 1280 720' }, parent)
@@ -69,6 +70,8 @@ export function inkLine(parent, text, x, baseline, size, speed) {
       return { p, len }
     })
     const sum = lens.reduce((a, s) => a + s.len, 0) || 1
+    // de vez en cuando, al apoyar la pluma para empezar una palabra, se escapa una gota de tinta
+    if (lens.length && (gi === 0 || text[gi - 1] === ' ') && Math.random() < blotRate) blots.push({ t, ...pt(lens[0], 0) })
     const gdur = base * (0.85 + Math.random() * 0.3)
     lens.forEach((s, k) => {
       const dur = gdur * (s.len / sum)
@@ -88,7 +91,7 @@ export function inkLine(parent, text, x, baseline, size, speed) {
 
   let done = 0   // trazos ya completos (el bucle no los vuelve a tocar)
   return {
-    total,
+    total, blots,
     /* avanza la tinta hasta t ms y devuelve dónde está la punta: {x, y, lift} */
     draw(t) {
       while (done < strokes.length && t >= strokes[done].t1) { strokes[done].p.style.strokeDashoffset = 0; done++ }
